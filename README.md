@@ -1,7 +1,7 @@
 # Image to Timelapse
 ### Time Lapse Generator with Pose Matcher
 
-[Link to tool](https://bbelk.github.io/PoseMatcherDev/)
+[Link to tool](https://bbelk.github.io/ImageToTimelapse/)
 
 ## Table of Contents
 1. [Description](#description)
