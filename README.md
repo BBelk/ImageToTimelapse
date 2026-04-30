@@ -1,4 +1,4 @@
-# Image to Timelapse
+# [Image to Timelapse](title)
 ### Time Lapse Generator with Pose Matcher
 
 [Link to tool](https://bbelk.github.io/ImageToTimelapse/)
