@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Image to Timelapse</title>
+  <link rel="stylesheet" href="style.css">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-K49H7QCTCR"></script>
+  <script>
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isLight = saved === 'light' || (!saved && !prefersDark);
+      if (saved) document.documentElement.setAttribute('data-theme', saved);
+      if (isLight) document.documentElement.classList.add('light-theme');
+    })();
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-K49H7QCTCR');
+  </script>
+</head>
+<body>
+  <div id="top-bar">
+    <h1>Image to Timelapse <span class="subtitle">Time Lapse Generator with Pose Matcher</span></h1>
+    <button id="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle light/dark mode"></button>
+  </div>
+
+  <div id="info-panel">
+    <p class="repo-link"><a href="https://github.com/BBelk/PoseMatcherDev" target="_blank" rel="noopener">View on GitHub</a></p>
+    <p>Align and compare images by pose or custom anchor points. Export as GIF, MP4, or WebM.</p>
+    <p class="privacy-note">All processing happens in your browser. Your images never leave your device.</p>
+  </div>
+
+  <section id="images-section">
+    <details id="images-details" open>
+      <summary>1. Images <button id="clear-all-btn" style="display:none">Clear All</button></summary>
+      <p class="section-hint">First image = reference. Others align to it.</p>
+      <div id="compare-grid"></div>
+      <div id="compare-upload">
+        <div class="upload-prompt-cmp">
+          <label class="upload-label upload-label-lg" for="cmp-file">+ Add Images</label>
+          <p class="prompt-sub">Drop files or click to upload</p>
+          <p class="upload-warning">Adding many images at once may cause a delay while processing</p>
+          <p id="custom-point-hint" class="upload-hint" style="display:none">Select a photo to customize keypoint location</p>
+        </div>
+        <input type="file" id="cmp-file" class="file-input" accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff,image/heic,image/heif" multiple>
+      </div>
+    </details>
+  </section>
+
+  <div id="pose-model-loading" class="model-loading" style="display:none">
+    <div class="model-loading-spinner"></div>
+    <span class="model-loading-text">Loading pose detector...</span>
+  </div>
+
+  <div id="action-bar">
+    <details id="options-details">
+      <summary>2. Options <button id="restore-defaults-btn" class="restore-btn">Restore Defaults</button></summary>
+      <div class="options-body">
+
+        <div class="mode-selector">
+          <label class="mode-option">
+            <input type="radio" name="mode" value="human" id="mode-human" checked>
+            <span>Human Pose</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="mode" value="custom" id="mode-custom">
+            <span>Custom Point</span>
+          </label>
+        </div>
+
+        <div class="opt-group" id="human-pose-options" style="display:none">
+          <div class="opt-group-title">Pose Alignment</div>
+          <div class="setting-compact">
+            <label for="align-part">Position anchor</label>
+            <select id="align-part">
+              <option value="0" selected>Nose</option>
+              <option value="1">Left Eye</option>
+              <option value="2">Right Eye</option>
+              <option value="3">Left Ear</option>
+              <option value="4">Right Ear</option>
+              <option value="5">Left Shoulder</option>
+              <option value="6">Right Shoulder</option>
+              <option value="7">Left Elbow</option>
+              <option value="8">Right Elbow</option>
+              <option value="9">Left Wrist</option>
+              <option value="10">Right Wrist</option>
+              <option value="11">Left Hip</option>
+              <option value="12">Right Hip</option>
+              <option value="13">Left Knee</option>
+              <option value="14">Right Knee</option>
+              <option value="15">Left Ankle</option>
+              <option value="16">Right Ankle</option>
+            </select>
+          </div>
+          <div class="setting-compact">
+            <label for="scale-toggle">Match scale</label>
+            <span class="inline-sub toggle-right">
+              <select id="scale-pair">
+                <option value="shoulders" selected>Shoulders</option>
+                <option value="hips">Hips</option>
+                <option value="eyes">Eyes</option>
+              </select>
+              <input type="checkbox" id="scale-toggle">
+            </span>
+          </div>
+          <div class="setting-compact">
+            <label for="rotate-toggle">Match rotation</label>
+            <span class="inline-sub toggle-right">
+              <select id="rotate-pair">
+                <option value="shoulders" selected>Shoulders</option>
+                <option value="hips">Hips</option>
+                <option value="eyes">Eyes</option>
+              </select>
+              <input type="checkbox" id="rotate-toggle">
+            </span>
+          </div>
+        </div>
+
+        <div class="opt-group">
+          <div class="opt-group-title">Format</div>
+          <div class="setting-compact setting-size-row">
+            <label>Size</label>
+            <span class="dim-inputs">
+              <input type="number" id="output-width" min="1" max="9999" step="1" placeholder="W"> x
+              <input type="number" id="output-height" min="1" max="9999" step="1" placeholder="H">
+            </span>
+            <button type="button" id="size-lock-btn" class="lock-btn" title="Lock size">&#x1F513;</button>
+            <span id="size-hint" class="size-hint-inline">Auto-sized from first image</span>
+          </div>
+          <div class="setting-compact">
+            <label for="output-format">Type</label>
+            <select id="output-format">
+              <option value="gif" selected>GIF</option>
+              <option value="mp4">MP4</option>
+              <option value="webm">WebM</option>
+              <option value="mov">MOV</option>
+            </select>
+          </div>
+          <div class="setting-compact" id="mp4-quality-row" style="display:none">
+            <label for="mp4-quality">Quality <span class="label-hint">(0 = smaller, 100 = best quality/larger)</span></label>
+            <span class="inline-sub">
+              <input type="range" id="mp4-quality" min="0" max="100" step="1" value="100">
+              <input type="number" id="mp4-quality-val" min="0" max="100" step="1" value="100">
+            </span>
+          </div>
+          <div id="gif-options-row">
+            <div class="setting-compact">
+              <label for="gif-lossy">Compression <span class="label-hint">(0 = lossless, higher = smaller file)</span></label>
+              <span class="inline-sub">
+                <input type="range" id="gif-lossy" min="0" max="100" step="1" value="0">
+                <input type="number" id="gif-lossy-val" min="0" max="100" step="1" value="0">
+              </span>
+            </div>
+            <div class="setting-compact">
+              <label for="gif-colors">Colors <span class="label-hint">(fewer = smaller file, max 256)</span></label>
+              <span class="inline-sub">
+                <input type="range" id="gif-colors" min="8" max="256" step="1" value="256">
+                <input type="number" id="gif-colors-val" min="8" max="256" step="1" value="256">
+              </span>
+            </div>
+            <div class="setting-compact">
+              <label for="gif-diff-thresh">Diff threshold <span class="label-hint">(higher = more aggressive optimization)</span></label>
+              <span class="inline-sub">
+                <input type="range" id="gif-diff-thresh" min="0" max="128" step="1" value="32">
+                <input type="number" id="gif-diff-thresh-val" min="0" max="128" step="1" value="32">
+              </span>
+            </div>
+            <div class="setting-compact">
+              <label for="gif-global-palette">Global palette <span class="label-hint">(smaller file, colors shared across frames)</span></label>
+              <input type="checkbox" id="gif-global-palette">
+            </div>
+          </div>
+          <div class="setting-row-triple">
+            <div class="setting-compact">
+              <label for="loop-toggle">Loop</label>
+              <input type="checkbox" id="loop-toggle" checked>
+            </div>
+            <div class="setting-compact">
+              <label for="frame-counter-toggle">Counter</label>
+              <input type="checkbox" id="frame-counter-toggle">
+            </div>
+            <div class="setting-compact" id="gif-optimize-row">
+              <label for="gif-diff-toggle">Optimize</label>
+              <input type="checkbox" id="gif-diff-toggle" checked>
+            </div>
+          </div>
+        </div>
+
+        <div class="opt-group">
+          <div class="opt-group-title">Timing</div>
+          <div class="setting-compact" id="single-duration-row">
+            <label for="frame-duration">Frame duration</label>
+            <span class="inline-sub">
+              <input type="number" id="frame-duration" min="0.1" max="10" step="0.1" value="0.5"> s
+            </span>
+          </div>
+          <div class="setting-compact">
+            <label for="custom-durations-toggle">Custom frame length</label>
+            <input type="checkbox" id="custom-durations-toggle">
+          </div>
+          <div id="custom-durations" style="display:none">
+            <div class="setting-compact">
+              <label for="first-frame-duration">First</label>
+              <span class="inline-sub"><input type="number" id="first-frame-duration" min="0.1" max="10" step="0.1" value="0.5"> s</span>
+            </div>
+            <div class="setting-compact">
+              <label for="middle-frame-duration">Middle</label>
+              <span class="inline-sub"><input type="number" id="middle-frame-duration" min="0.1" max="10" step="0.1" value="0.5"> s</span>
+            </div>
+            <div class="setting-compact">
+              <label for="last-frame-duration">Last</label>
+              <span class="inline-sub"><input type="number" id="last-frame-duration" min="0.1" max="10" step="0.1" value="0.5"> s</span>
+            </div>
+          </div>
+          <div class="setting-compact">
+            <label for="transition-toggle">Frame transitions</label>
+            <span class="inline-sub toggle-right">
+              <select id="transition-type">
+                <option value="fade" selected>Fade</option>
+                <option value="wipe">Wipe</option>
+                <option value="slide">Slide</option>
+                <option value="flash">Flash</option>
+                <option value="blur">Blur</option>
+              </select>
+              <input type="checkbox" id="transition-toggle">
+            </span>
+          </div>
+          <div class="setting-compact" id="transition-duration-row" style="display:none">
+            <label for="transition-duration">Transition time</label>
+            <span class="inline-sub"><input type="number" id="transition-duration" min="0.05" max="5" step="0.05" value="0.25"> s</span>
+          </div>
+        </div>
+
+        <div class="opt-group" id="detection-group" style="display:none">
+          <div class="opt-group-title">Detection</div>
+          <div class="setting-compact">
+            <label for="score-thresh">Person threshold</label>
+            <span class="inline-sub">
+              <input type="range" id="score-thresh" min="0.01" max="1" step="0.01" value="0.3">
+              <input type="number" id="score-thresh-val" min="0.01" max="1" step="0.01" value="0.3">
+            </span>
+          </div>
+          <div class="setting-compact">
+            <label for="kp-thresh">Keypoint threshold</label>
+            <span class="inline-sub">
+              <input type="range" id="kp-thresh" min="0.01" max="1" step="0.01" value="0.3">
+              <input type="number" id="kp-thresh-val" min="0.01" max="1" step="0.01" value="0.3">
+            </span>
+          </div>
+          <button id="redetect-btn" class="redetect-btn" disabled>Re-detect All</button>
+        </div>
+
+      </div>
+    </details>
+  </div>
+
+  <section id="output-section">
+    <div class="section-header generate-only">
+      <h2>3. Output</h2>
+      <button id="generate-btn-desktop">Generate Timelapse</button>
+      <button id="save-btn" style="display:none">Save Output</button>
+      <span id="output-size" style="display:none"></span>
+    </div>
+    <div id="error-banner" style="display:none"></div>
+    <div id="output-box" class="pose-box empty">
+      <div id="progress-container" class="progress-container idle">
+        <div class="spinner"></div>
+        <div class="progress-info">
+          <span id="progress-text" class="progress-text">Output will appear here</span>
+          <div class="progress-bar-wrapper">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+        </div>
+      </div>
+      <canvas id="overlay-canvas"></canvas>
+      <img id="output-gif" class="output-gif">
+      <video id="output-video" class="output-gif" muted playsinline controls></video>
+    </div>
+  </section>
+
+  <section id="generate-section-mobile">
+    <button id="generate-btn-mobile">Generate Timelapse</button>
+  </section>
+
+  <div id="person-modal" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Select a person</h3>
+        <button id="modal-close">&times;</button>
+      </div>
+      <canvas id="modal-canvas"></canvas>
+      <p class="modal-hint">Click a bounding box to select</p>
+    </div>
+  </div>
+
+  <div id="debug-panel" class="debug-panel" style="display:none">
+    <div class="debug-header">
+      <span>Debug Logs</span>
+      <span class="debug-actions">
+        <button id="debug-copy">Copy</button>
+        <button id="debug-clear">Clear</button>
+        <button id="debug-close">&times;</button>
+      </span>
+    </div>
+    <div id="debug-content" class="debug-content"></div>
+  </div>
+  <button id="debug-toggle" class="debug-toggle">🔧</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
