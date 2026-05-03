@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bbelk.github.io/ImageToTimelapse/sitemap.xml
